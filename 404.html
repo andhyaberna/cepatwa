@@ -191,7 +191,11 @@
             // Other Socials
             if (socialsJson) {
                 let socials = {};
-                try { socials = JSON.parse(socialsJson); } catch(e){}
+                if (typeof socialsJson === 'object' && socialsJson !== null) {
+                    socials = socialsJson;
+                } else {
+                    try { socials = JSON.parse(socialsJson); } catch(e){}
+                }
                 
                 if (socials.fb) socialContainer.innerHTML += renderSocialIcon('facebook', socials.fb, 'blue');
                 if (socials.ig) socialContainer.innerHTML += renderSocialIcon('instagram', socials.ig, 'pink');

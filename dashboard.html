@@ -719,9 +719,9 @@
                     document.getElementById('bio-wa').value = d.wa || '';
                     document.getElementById('bio-email').value = d.email || '';
                     
-                    if (d.socials_json) {
+                    if (d.socials) {
                         try {
-                            const socials = JSON.parse(d.socials_json);
+                            const socials = d.socials;
                             document.getElementById('bio-fb').value = socials.fb || '';
                             document.getElementById('bio-ig').value = socials.ig || '';
                             document.getElementById('bio-twitter').value = socials.twitter || '';
