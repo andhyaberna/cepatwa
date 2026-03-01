@@ -312,14 +312,25 @@
                                 <tbody id="list-orders" class="divide-y divide-slate-100"></tbody>
                             </table>
                         </div>
+                        <div class="px-8 py-5 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                            <span class="text-xs font-medium text-slate-500" id="member-pagination-info">Menampilkan 0 member</span>
+                            <div class="flex gap-2">
+                                <button onclick="changeMemberPage(-1)" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors disabled:opacity-50" id="btn-prev-member" disabled>Prev</button>
+                                <button onclick="changeMemberPage(1)" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors disabled:opacity-50" id="btn-next-member" disabled>Next</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- MEMBERS TAB -->
                 <div id="tab-members" class="tab-content">
                     <div class="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                        <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+                        <div class="px-8 py-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/30">
                             <h3 class="font-bold text-slate-700 text-lg">Data Member</h3>
+                            <div class="relative w-full md:w-64">
+                                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                                <input type="text" id="search-member" placeholder="Cari member..." class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" onkeyup="debounceMemberSearch()">
+                            </div>
                         </div>
                         <div class="overflow-x-auto custom-scroll">
                             <table class="w-full text-left text-sm min-w-[700px]" id="list-members">
@@ -831,6 +842,63 @@
             } 
         };
 
+        let memberPage = 1;
+        let memberLimit = 20;
+        let memberSearchTimeout = null;
+        let totalMemberPages = 1;
+
+        async function fetchMembers(page = 1) {
+            memberPage = page;
+            const search = document.getElementById('search-member').value;
+            const list = document.getElementById('list-members').getElementsByTagName('tbody')[0];
+            
+            // Show loading state
+            list.innerHTML = '<tr><td colspan="6" class="px-8 py-10 text-center"><i data-lucide="loader" class="w-6 h-6 animate-spin mx-auto text-indigo-600 mb-2"></i><p class="text-xs text-slate-400 font-medium">Memuat data member...</p></td></tr>';
+            lucide.createIcons();
+
+            try {
+                const res = await fetch(SCRIPT_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify({ 
+                        action: 'get_members_page', 
+                        page: page, 
+                        limit: memberLimit,
+                        search: search
+                    }) 
+                });
+                const r = await res.json();
+                if(r.status === 'success') {
+                    renderMembers(r.data);
+                    updateMemberPaginationUI(r);
+                } else {
+                    list.innerHTML = `<tr><td colspan="6" class="px-8 py-10 text-center text-red-500 text-sm font-bold">${r.message}</td></tr>`;
+                }
+            } catch (err) {
+                list.innerHTML = `<tr><td colspan="6" class="px-8 py-10 text-center text-red-500 text-sm font-bold">Gagal memuat data member</td></tr>`;
+            }
+        }
+
+        function changeMemberPage(delta) {
+            const newPage = memberPage + delta;
+            if(newPage > 0 && newPage <= totalMemberPages) {
+                fetchMembers(newPage);
+            }
+        }
+
+        function debounceMemberSearch() {
+            clearTimeout(memberSearchTimeout);
+            memberSearchTimeout = setTimeout(() => {
+                fetchMembers(1);
+            }, 500);
+        }
+
+        function updateMemberPaginationUI(r) {
+            totalMemberPages = r.total_pages;
+            document.getElementById('member-pagination-info').innerText = `Halaman ${r.current_page} dari ${r.total_pages} (Total ${r.total} member)`;
+            document.getElementById('btn-prev-member').disabled = r.current_page <= 1;
+            document.getElementById('btn-next-member').disabled = r.current_page >= r.total_pages;
+        }
+
         function renderMembers(members) {
             const list = document.getElementById('list-members').getElementsByTagName('tbody')[0];
             list.innerHTML = '';
@@ -854,7 +922,7 @@
         }
 
         function renderAdminUI(r) {
-            renderMembers(r.users || []);
+            // renderMembers(r.users || []); // Modified: Members are now fetched via pagination
             cachedPages = r.pages || []; cachedProducts = r.products || [];
             document.getElementById('stat-orders').innerText = (r.stats.orders || 0) + ' Transaksi'; document.getElementById('stat-rev').innerText = 'Rp ' + Number(r.stats.rev || 0).toLocaleString('id-ID');
             document.getElementById('list-orders').innerHTML = r.orders.map(o => `
@@ -938,6 +1006,8 @@
                 renderAdminUI(JSON.parse(cachedDataStr)); 
                 syncLabel.classList.remove('hidden');
             }
+
+            fetchMembers(1);
             
             try { 
                 if(typeof SCRIPT_URL === 'undefined') return;

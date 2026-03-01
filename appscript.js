@@ -145,6 +145,7 @@ function doPost(e) {
       case "save_affiliate_pixel": return jsonRes(saveAffiliatePixel(data));
       case "save_bio_link": return jsonRes(saveBioLink(data));
       case "get_bio_link": return jsonRes(getBioLink(data));
+      case "get_members_page": return jsonRes(getMembersPage(data));
       default: return jsonRes({ status: "error", message: "Aksi tidak terdaftar: " + (action || "unknown") });
     }
   } catch (err) {
@@ -948,7 +949,7 @@ function getAdminData(cfg) {
       products: p.slice(1),
       pages: pg.slice(1),
       settings: t,
-      users: u.slice(1).reverse()
+      users: [] // Modified: Fetch separately via get_members_page
     };
   } catch (e) {
     return { status: "error", message: e.toString() };
@@ -1691,6 +1692,47 @@ function saveBioLink(d) {
     }
 
     return { status: "success", message: "Bio Link berhasil disimpan!" };
+  } catch (e) {
+    return { status: "error", message: e.toString() };
+  }
+}
+
+function getMembersPage(d) {
+  try {
+    const page = Number(d.page || 1);
+    const limit = Number(d.limit || 20);
+    const search = String(d.search || "").toLowerCase().trim();
+    
+    const u = mustSheet_("Users").getDataRange().getValues();
+    // u[0] is Header. Data starts at u[1].
+    
+    let matched = [];
+    // Iterate from newest (bottom) to oldest (top), skipping header (index 0)
+    for (let i = u.length - 1; i >= 1; i--) {
+        if (search) {
+            // Search in ID, Email, Name
+            const str = (String(u[i][0]) + " " + String(u[i][1]) + " " + String(u[i][3])).toLowerCase();
+            if (str.includes(search)) matched.push(u[i]);
+        } else {
+            matched.push(u[i]);
+        }
+    }
+    
+    const total = matched.length;
+    const totalPages = Math.ceil(total / limit);
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const data = matched.slice(start, end);
+    
+    return { 
+        status: "success", 
+        data: data, 
+        total: total, 
+        total_pages: totalPages, 
+        current_page: page,
+        limit: limit
+    };
+    
   } catch (e) {
     return { status: "error", message: e.toString() };
   }
